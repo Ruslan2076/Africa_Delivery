@@ -1,0 +1,50 @@
+@startuml observability-pipeline
+skinparam defaultFontName "DejaVu Sans"
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam rectangleRoundCorner 6
+skinparam componentStyle rectangle
+left to right direction
+title Africa Delivery — схема сбора телеметрии
+
+rectangle "Источники" {
+  component "Мобильное приложение\nOTel SDK: RUM, время до\nпервого товара, ошибки" as app
+  component "Монолит Go, роли\n«каталог» и «checkout»\nOTel SDK: метрики RED,\nлоги JSON, трейсы" as mono
+  component "Outbox и воркеры\nуведомлений, выплат,\nинтеграций (trace-id\nв заголовках сообщений)" as workers
+  component "Адаптеры партнёров\nM-Pesa, Flutterwave, Paystack,\nSendbox, Sendy, SMS, WhatsApp" as adapters
+  component "Managed PostgreSQL,\nRedis, Kubernetes,\nCDN (USE-метрики, логи edge)" as infra
+  component "Синтетические проверки\nиз Лагоса и Найроби\n(каждую минуту)" as synth
+}
+
+rectangle "Страновая ячейка\n(Нигерия, Кения)" as cell {
+  component "OTel Collector ячейки\nудаление ПДн из атрибутов\nи логов" as ccol
+}
+
+component "OTel Collector в кластере\nсэмплирование трейсов: 100% ошибок,\n10% успешных; логи: 100% ошибок,\n1% успешных INFO" as col
+
+rectangle "Managed-бэкенд наблюдаемости" {
+  database "Метрики\n(Prometheus-совместимое\nхранилище, 13 мес)" as prom
+  database "Логи\n(14 дней)" as logs
+  database "Трейсы\n(7 дней)" as traces
+}
+
+component "Grafana\nдашборды SLO,\nзолотые сигналы,\nдашборд запуска" as graf
+component "Alertmanager\nburn-rate алерты SLO,\nCircuit Breaker > 5 мин" as alert
+actor "Дежурный\n(звонок + мессенджер)" as oncall
+
+app --> col : OTLP/HTTPS
+mono --> col : OTLP
+workers --> col : OTLP
+adapters --> col : OTLP
+infra --> col : метрики провайдера, логи CDN
+synth --> prom : результаты проверок
+ccol --> col : OTLP без ПДн
+col --> prom : метрики
+col --> logs : логи
+col --> traces : трейсы
+prom --> graf
+logs --> graf
+traces --> graf
+prom --> alert : правила SLI/SLO
+alert --> oncall : инцидент
+@enduml
