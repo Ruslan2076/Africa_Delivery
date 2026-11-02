@@ -1,0 +1,29 @@
+@startuml stakeholder-influence-interest
+skinparam defaultFontName "DejaVu Sans"
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam rectangleRoundCorner 4
+skinparam rectangleBorderColor #555555
+skinparam ArrowColor #00000000
+
+title Africa Delivery — карта «Влияние / Интерес»
+
+rectangle "**Удовлетворять**\n(высокое влияние, низкий интерес)\n\nSTK-07 Регуляторы по защите данных\nSTK-08 Платёжные партнёры\n(M-Pesa, Flutterwave, Paystack)\nSTK-09 Логистические партнёры\n(Sendbox, Sendy)" as Q1 #FFF4D6
+
+rectangle "**Управлять плотно**\n(высокое влияние, высокий интерес)\n\n**STK-01 К. Орлов, инвестор** (решает)\n**STK-02 А. Вебер, CFO** (вето на деньги)\nSTK-04 М. Лефевр, CEO\nSTK-03 Р. Менон, CTO" as Q2 #F9D7D2
+
+rectangle "**Наблюдать**\n(низкое влияние, низкий интерес)\n\nSTK-06 А. Нвосу, внешний юрист\n(влияет через позицию STK-07)" as Q3 #EEEEEE
+
+rectangle "**Информировать**\n(низкое влияние, высокий интерес)\n\nSTK-05 С. Алмейда, маркетинг\nSTK-10 Продавцы (МСБ)\nSTK-11 Покупатели\nSTK-12 Шесть контракторов" as Q4 #DCEBF7
+
+Q1 -right[hidden]- Q2
+Q3 -right[hidden]- Q4
+Q1 -down[hidden]- Q3
+Q2 -down[hidden]- Q4
+
+legend bottom
+  Вертикаль: влияние на архитектурные решения (снизу вверх растёт)
+  Горизонталь: интерес к проекту (слева направо растёт)
+  Жирным — решающие голоса при конфликте
+endlegend
+@enduml
