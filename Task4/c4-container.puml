@@ -1,0 +1,65 @@
+@startuml c4-container
+!include <C4/C4_Container>
+skinparam defaultFontName "DejaVu Sans"
+skinparam backgroundColor #FFFFFF
+LAYOUT_TOP_DOWN()
+
+title Africa Delivery — C4 Container, сгруппировано по регионам развёртывания (ADR-003)
+
+Person(buyer, "Покупатель", "Мобильное приложение, страна аккаунта — по номеру телефона")
+Person(operator, "Оператор страны", "KYC продавцов, возвраты, поддержка")
+
+Container(app, "Мобильное приложение", "Kotlin / Swift", "Офлайн-кеш каталога, OTel SDK")
+Container(cdn, "CDN", "Edge-узлы в Лагосе и Найроби", "Изображения, ответы каталога, stale-if-error 24 ч, маршрутизация по стране")
+
+System_Boundary(central, "Центральный контур — AWS af-south-1, Кейптаун (без ПДн)") {
+  Container(cat, "Монолит, роль «каталог»", "Go, EKS", "Каталог, поиск, модерация, агрегаты дашборда")
+  ContainerDb(catdb, "PostgreSQL каталога", "RDS Multi-AZ", "Товары, цены, остатки для показа, профили магазинов")
+  ContainerDb(redis, "Redis", "ElastiCache", "Карточки, выдача, агрегаты (ADR-002)")
+  ContainerDb(s3, "Объектное хранилище", "S3", "Изображения товаров")
+}
+
+System_Boundary(ng, "Ячейка NG — локальный провайдер, Лагос") {
+  Container(ngapp, "Монолит, роли «checkout», «оплата», «уведомления», «бэк-офис NG»", "Go, Kubernetes", "country_code=NG")
+  ContainerDb(ngdb, "PostgreSQL NG", "Managed / Patroni", "Учётные записи, заказы, платежи, согласия; копия каталога только для чтения")
+  Container(ngkms, "Хранилище ключей NG", "KMS провайдера / Vault", "Ключи не покидают страну")
+  Container(ngexp, "Шлюз выгрузки и сборщик NG", "Go, OTel Collector", "Агрегаты без ID, телеметрия без ПДн")
+}
+
+System_Boundary(ke, "Ячейка KE — локальный провайдер, Найроби") {
+  Container(keapp, "Монолит, роли «checkout», «оплата», «уведомления», «бэк-офис KE»", "Go, Kubernetes", "country_code=KE")
+  ContainerDb(kedb, "PostgreSQL KE", "Managed", "Учётные записи, заказы, платежи M-Pesa, согласия; копия каталога")
+  Container(kekms, "Хранилище ключей KE", "KMS провайдера / Vault", "Ключи не покидают страну")
+  Container(keexp, "Шлюз выгрузки и сборщик KE", "Go, OTel Collector", "Агрегаты без ID, телеметрия без ПДн")
+}
+
+System_Ext(flw, "Flutterwave / Paystack", "Платежи и выплаты, NG")
+System_Ext(mpesa, "M-Pesa / Flutterwave", "Платежи и выплаты, KE")
+System_Ext(sendbox, "Sendbox", "Доставка NG")
+System_Ext(sendy, "Sendy", "Доставка KE")
+System_Ext(msg, "SMS-шлюз, WhatsApp Business API", "Уведомления")
+
+Rel(buyer, app, "Ищет, заказывает, платит")
+Rel(app, cdn, "Каталог и изображения", "HTTPS")
+Rel(app, ngapp, "Заказы и оплата, если страна аккаунта NG", "HTTPS")
+Rel(app, keapp, "Заказы и оплата, если страна аккаунта KE", "HTTPS")
+Rel(operator, ngapp, "Бэк-офис своей страны", "HTTPS")
+Rel(cdn, cat, "Промахи кеша", "HTTPS")
+Rel(cdn, s3, "Изображения", "HTTPS")
+Rel(cat, catdb, "Читает и пишет", "SQL")
+Rel(cat, redis, "Cache-Aside", "RESP")
+Rel(catdb, ngdb, "Копия каталога, только входящая", "логическая репликация")
+Rel(catdb, kedb, "Копия каталога, только входящая", "логическая репликация")
+Rel(ngapp, ngdb, "Читает и пишет", "SQL")
+Rel(ngapp, ngkms, "Шифрует поля ПДн")
+Rel(ngexp, cat, "Агрегаты раз в минуту, без ID", "HTTPS")
+Rel(keapp, kedb, "Читает и пишет", "SQL")
+Rel(keapp, kekms, "Шифрует поля ПДн")
+Rel(keexp, cat, "Агрегаты раз в минуту, без ID", "HTTPS")
+Rel(ngapp, flw, "Платёж, выплата, webhook", "REST")
+Rel(ngapp, sendbox, "Отправка, статусы", "REST")
+Rel(keapp, mpesa, "Платёж, выплата, webhook", "REST")
+Rel(keapp, sendy, "Отправка, статусы", "REST")
+Rel(ngapp, msg, "SMS, WhatsApp", "REST")
+Rel(keapp, msg, "SMS, WhatsApp", "REST")
+@enduml

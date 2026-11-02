@@ -1,0 +1,74 @@
+@startuml deployment-diagram
+skinparam defaultFontName "DejaVu Sans"
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam nodeBackgroundColor #F7F4F0
+skinparam databaseBackgroundColor #FFFFFF
+title Africa Delivery — Deployment (Год 1; warm standby — с 7-го месяца)
+
+cloud "CDN: edge Лагос, Найроби" as cdn
+
+node "AWS af-south-1 (Кейптаун) — центральный контур, без ПДн" as aws {
+  node "Зона A" as az1 {
+    node "EKS-узлы\nроль «каталог»" as eks1
+    database "RDS PostgreSQL\nосновной" as rds1
+  }
+  node "Зона B" as az2 {
+    node "EKS-узлы\nроль «каталог»" as eks2
+    database "RDS PostgreSQL\nсинхронная реплика" as rds2
+  }
+  node "Зона C" as az3 {
+    node "EKS-узлы\nроль «каталог»" as eks3
+  }
+  database "ElastiCache Redis\n(2 зоны)" as redis
+  database "S3: изображения,\nбэкапы каталога" as s3
+}
+
+node "Azure South Africa North (Йоханнесбург) — резерв центрального контура" as az {
+  database "Копии каталога и изображений\n(без ПДн)" as azbk
+  node "AKS warm standby\n(с 7-го месяца)" as aks
+}
+
+node "Нигерия — ячейка NG" as ng {
+  node "Провайдер NG, ЦОД 1 (Лагос)" as ng1 {
+    node "Kubernetes:\ncheckout, оплата,\nуведомления, бэк-офис NG" as ngk
+    database "PostgreSQL NG\nосновной + реплика в зоне" as ngdb
+    node "KMS / Vault NG" as ngkms
+  }
+  node "ЦОД 2 или второй провайдер (Нигерия)" as ng2 {
+    database "Асинхронная реплика NG,\nшифрованные бэкапы" as ngdr
+    node "IaC-шаблон кластера\n(холодный)" as ngcold
+  }
+}
+
+node "Кения — ячейка KE" as ke {
+  node "Провайдер KE, ЦОД 1 (Найроби)" as ke1 {
+    node "Kubernetes:\ncheckout, оплата,\nуведомления, бэк-офис KE" as kek
+    database "PostgreSQL KE\nосновной + реплика в зоне" as kedb
+    node "KMS / Vault KE" as kekms
+  }
+  node "Второй провайдер, другой ЦОД Найроби" as ke2 {
+    database "Асинхронная реплика KE,\nшифрованные бэкапы" as kedr
+    node "IaC-шаблон кластера\n(холодный)" as kecold
+  }
+}
+
+cdn --> eks1 : HTTPS
+cdn --> s3 : изображения
+rds1 --> rds2 : синхронно
+rds1 --> ngdb : каталог, логическая\nрепликация (входящая)
+rds1 --> kedb : каталог, логическая\nрепликация (входящая)
+s3 --> azbk : копии без ПДн\nкаждый час
+ngdb --> ngdr : WAL, асинхронно\n(RPO ≤ 5 мин)
+kedb --> kedr : WAL, асинхронно\n(RPO ≤ 5 мин)
+ngk --> eks1 : агрегаты без ID
+kek --> eks1 : агрегаты без ID
+
+note bottom of ng
+  Данные субъектов NG не покидают Нигерию:
+  реплика и бэкапы — только в стране
+end note
+note bottom of ke
+  Данные субъектов KE не покидают Кению
+end note
+@enduml
