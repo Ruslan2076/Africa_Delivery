@@ -1,0 +1,44 @@
+@startuml c4-context
+!include <C4/C4_Context>
+skinparam defaultFontName "DejaVu Sans"
+skinparam backgroundColor #FFFFFF
+LAYOUT_TOP_DOWN()
+
+title Africa Delivery — C4 Context (MVP, запуск 15.10 в Нигерии и Кении)
+
+Person(buyer, "Покупатель со смартфоном", "Android дешевле $150, 3G/LTE с обрывами")
+Person(buyer_ussd, "Покупатель с кнопочным телефоном", "Получает статусы заказа по SMS")
+Person(seller, "Продавец (МСБ)", "Ведёт заказы через WhatsApp или кабинет")
+Person(operator, "Оператор бэк-офиса", "KYC продавцов, модерация каталога, возвраты")
+Person(ceo, "Руководство (CEO, инвестор)", "Дашборд запуска с телефона")
+
+System(platform, "Africa Delivery Platform", "Модульный монолит на Go: каталог, заказы, оплата, уведомления, продавцы, ПДн по странам (ADR-001)")
+
+System_Ext(mpesa, "M-Pesa API", "Мобильные платежи, Кения")
+System_Ext(flutterwave, "Flutterwave API", "Платежи и выплаты, Нигерия и Кения")
+System_Ext(paystack, "Paystack", "Резервный платёжный партнёр, Нигерия")
+System_Ext(sendbox, "Sendbox API", "Доставка, Нигерия")
+System_Ext(sendy, "Sendy API", "Доставка, Кения")
+System_Ext(whatsapp, "WhatsApp Business API", "Канал продавцов и уведомлений")
+System_Ext(sms, "SMS/USSD-шлюз", "SMS-уведомления; USSD — после MVP")
+System_Ext(stores, "App Store / Google Play, push", "Публикация приложений, диплинки, push")
+
+Rel(buyer, platform, "Ищет товары, оформляет и оплачивает заказ, следит за статусом", "HTTPS, мобильное приложение")
+Rel(buyer_ussd, sms, "Получает SMS о статусе заказа", "GSM")
+Rel(seller, whatsapp, "Подтверждает заказы, получает уведомления", "WhatsApp")
+Rel(operator, platform, "Верифицирует продавцов, модерирует каталог, обрабатывает возвраты", "HTTPS, веб")
+Rel(ceo, platform, "Смотрит регистрации, заказы, выручку раз в минуту", "HTTPS")
+
+Rel(platform, mpesa, "Инициирует платёж, получает подтверждение", "REST + webhook")
+Rel(platform, flutterwave, "Принимает платёж, выплачивает продавцу в тот же день", "REST + webhook")
+Rel(platform, paystack, "Переключает приём платежей при отказе основного партнёра", "REST + webhook")
+Rel(platform, sendbox, "Создаёт отправку, получает статусы доставки", "REST + webhook")
+Rel(platform, sendy, "Создаёт отправку, получает статусы доставки", "REST + webhook")
+Rel(platform, whatsapp, "Отправляет заказы продавцам и статусы покупателям", "REST + webhook")
+Rel(platform, sms, "Отправляет SMS-уведомления", "REST")
+Rel(platform, stores, "Публикует сборки, отправляет push", "HTTPS")
+
+Lay_R(mpesa, flutterwave)
+Lay_R(flutterwave, paystack)
+Lay_R(sendbox, sendy)
+@enduml
